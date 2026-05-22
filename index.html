@@ -1436,7 +1436,105 @@
                     style: 'currency',
                     currency: 'IDR',
                     minimumFractionDigits: 0
-                }).format(Number(amount || 0));
+                }).format(this.toNumber(amount));
+            },
+
+            toNumber(value) {
+                if (value === null || value === undefined || value === '') return 0;
+                if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+
+                let cleaned = String(value).trim();
+
+                // Handle strings from Google Sheets / Indonesian currency format.
+                cleaned = cleaned
+                    .replace(/Rp/gi, '')
+                    .replace(/\s/g, '')
+                    .replace(/[^\d,.\-]/g, '');
+
+                if (cleaned.includes(',') && cleaned.includes('.')) {
+                    // Example: 1.250.000,50
+                    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+                } else if (cleaned.includes(',')) {
+                    // Example: 1250000,50 or 1,250,000
+                    const parts = cleaned.split(',');
+                    if (parts.length === 2 && parts[1].length <= 2) {
+                        cleaned = parts[0].replace(/\./g, '') + '.' + parts[1];
+                    } else {
+                        cleaned = cleaned.replace(/,/g, '');
+                    }
+                } else {
+                    // Example: 1.250.000
+                    cleaned = cleaned.replace(/\./g, '');
+                }
+
+                const numberValue = Number(cleaned);
+                return Number.isFinite(numberValue) ? numberValue : 0;
+            },
+
+            normalizeType(type) {
+                const value = String(type || '').trim().toLowerCase();
+                if (['income', 'pemasukan', 'in', 'credit', 'kredit', 'masuk'].includes(value)) return 'income';
+                if (['expense', 'pengeluaran', 'out', 'debit', 'debet', 'keluar'].includes(value)) return 'expense';
+                return value;
+            },
+
+            parseDate(value) {
+                if (!value) return new Date();
+                if (value instanceof Date) return value;
+
+                // Google Sheets / Apps Script sometimes returns full ISO, plain date, or serial number.
+                if (typeof value === 'number') {
+                    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+                    return new Date(excelEpoch.getTime() + value * 86400000);
+                }
+
+                const raw = String(value).trim();
+                const parsed = new Date(raw);
+                if (!Number.isNaN(parsed.getTime())) return parsed;
+
+                // Fallback for dd/mm/yyyy or dd-mm-yyyy.
+                const m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+                if (m) {
+                    const year = m[3].length === 2 ? Number('20' + m[3]) : Number(m[3]);
+                    return new Date(year, Number(m[2]) - 1, Number(m[1]));
+                }
+
+                return new Date();
+            },
+
+            isSameMonthYear(dateValue, refDate = new Date()) {
+                const d = this.parseDate(dateValue);
+                return d.getMonth() === refDate.getMonth() && d.getFullYear() === refDate.getFullYear();
+            },
+
+            getActiveWallets() {
+                const active = Array.isArray(state.globalSettings.activeWallets)
+                    ? state.globalSettings.activeWallets
+                    : [];
+
+                // Kalau setting aktif kosong / data lama beda ID, jangan sembunyikan data.
+                if (active.length === 0) return state.wallets;
+
+                const activeSet = new Set(active.map(v => String(v).toLowerCase()));
+
+                const filtered = state.wallets.filter(w => {
+                    return activeSet.has(String(w.id).toLowerCase()) ||
+                           activeSet.has(String(w.name).toLowerCase());
+                });
+
+                return filtered.length ? filtered : state.wallets;
+            },
+
+            getActiveWalletNames() {
+                return new Set(this.getActiveWallets().map(w => String(w.name || '').toLowerCase()));
+            },
+
+            getMonthlyTransactions(refDate = new Date()) {
+                return state.transactions.filter(t => this.isSameMonthYear(t.date, refDate));
+            },
+
+            sortTransactionsDesc(transactions) {
+                return [...transactions].sort((a, b) => this.parseDate(b.date) - this.parseDate(a.date));
             },
 
             init() {
@@ -1449,6 +1547,11 @@
                     document.getElementById('view-auth').classList.add('hidden');
                     document.getElementById('app-container').classList.remove('hidden');
                     this.navigate('dashboard');
+
+                    // Saat halaman dibuka ulang dalam kondisi sudah login, tetap tarik data terbaru dari Google Sheets.
+                    if (state.globalSettings.scriptUrl) {
+                        setTimeout(() => this.syncFromCloud(true), 300);
+                    }
                 } else {
                     document.getElementById('view-auth').classList.remove('hidden');
                 }
@@ -1662,34 +1765,60 @@
                 if(quoteEl) quoteEl.innerText = quote;
             },
 
+
             renderDashboard() {
                 let totalBal = 0;
-                let monthInc = 0;
-                let monthExp = 0;
-                let totPribadi = 0, totBisnis = 0, totTabungan = 0;
-                let htmlPribadi = '', htmlBisnis = '', htmlTabungan = '';
+                let totPribadi = 0;
+                let totBisnis = 0;
+                let totTabungan = 0;
+                let htmlPribadi = '';
+                let htmlBisnis = '';
+                let htmlTabungan = '';
 
-                const currentMonth = new Date().getMonth();
+                const activeWallets = this.getActiveWallets();
 
-                state.wallets.forEach(w => {
-                    // Hanya render wallet yang aktif di settings
-                    if(!state.globalSettings.activeWallets.includes(w.id)) return;
+                activeWallets.forEach(w => {
+                    const balance = this.toNumber(w.balance);
+                    const group = String(w.group || '').toLowerCase();
 
-                    totalBal += w.balance;
+                    totalBal += balance;
+
                     const itemHtml = `
                     <div class="flex justify-between items-center p-2 rounded-lg hover:bg-[var(--hover-bg)] transition cursor-pointer">
                         <div class="flex items-center gap-2">
-                            <div class="w-8 h-8 rounded-full neu-pressed flex items-center justify-center ${w.color} bg-[var(--surface-color)] text-xs">
-                                <i class="fa-solid ${w.icon}"></i>
+                            <div class="w-8 h-8 rounded-full neu-pressed flex items-center justify-center ${w.color || 'text-blue-500'} bg-[var(--surface-color)] text-xs">
+                                <i class="fa-solid ${w.icon || 'fa-wallet'}"></i>
                             </div>
-                            <p class="text-xs font-bold text-textMain">${w.name}</p>
+                            <p class="text-xs font-bold text-textMain">${w.name || '-'}</p>
                         </div>
-                        <p class="font-bold text-xs text-textMain">${app.formatCur(w.balance)}</p>
+                        <p class="font-bold text-xs text-textMain">${app.formatCur(balance)}</p>
                     </div>`;
 
-                    if(w.group === 'pribadi') { totPribadi += w.balance; htmlPribadi += itemHtml; }
-                    else if(w.group === 'bisnis') { totBisnis += w.balance; htmlBisnis += itemHtml; }
-                    else if(w.group === 'tabungan') { totTabungan += w.balance; htmlTabungan += itemHtml; }
+                    if (group === 'pribadi') {
+                        totPribadi += balance;
+                        htmlPribadi += itemHtml;
+                    } else if (group === 'bisnis') {
+                        totBisnis += balance;
+                        htmlBisnis += itemHtml;
+                    } else if (group === 'tabungan') {
+                        totTabungan += balance;
+                        htmlTabungan += itemHtml;
+                    }
+                });
+
+                const monthlyTransactions = this.getMonthlyTransactions(new Date());
+                let monthInc = 0;
+                let monthExp = 0;
+
+                monthlyTransactions.forEach(t => {
+                    const type = this.normalizeType(t.type);
+                    const amount = this.toNumber(t.amount);
+
+                    if (type === 'income') {
+                        monthInc += amount;
+                    } else if (type === 'expense') {
+                        monthExp += amount;
+                    }
                 });
 
                 document.getElementById('dash-total-balance').innerText = app.formatCur(totalBal);
@@ -1700,27 +1829,27 @@
                 document.getElementById('total-tabungan').innerText = app.formatCur(totTabungan);
                 document.getElementById('list-tabungan').innerHTML = htmlTabungan || '<p class="text-xs text-textMuted p-2">Belum ada wallet.</p>';
 
-                const recentTxHtml = state.transactions.slice(0, 5).map(t => {
-                    const txDate = new Date(t.date);
-                    if(txDate.getMonth() === currentMonth && txDate.getFullYear() === new Date().getFullYear()) {
-                        if(t.type === 'income') monthInc += t.amount;
-                        else monthExp += t.amount;
-                    }
-                    
-                    const isInc = t.type === 'income';
+                const recentTxHtml = this.sortTransactionsDesc(state.transactions).slice(0, 7).map(t => {
+                    const type = this.normalizeType(t.type);
+                    const isInc = type === 'income';
+                    const amount = this.toNumber(t.amount);
+
                     return `
                     <tr class="border-b border-[var(--border-light)] hover:bg-[var(--hover-bg)] transition">
-                        <td class="px-4 py-3 font-bold text-textMain">${t.desc}</td>
-                        <td class="px-4 py-3 text-xs"><span class="px-3 py-1 rounded-full neu-flat bg-[var(--surface-color)] font-medium">${t.category}</span></td>
-                        <td class="px-4 py-3 text-xs font-semibold text-textMuted">${t.wallet}</td>
+                        <td class="px-4 py-3 font-bold text-textMain">${t.desc || '-'}</td>
+                        <td class="px-4 py-3 text-xs"><span class="px-3 py-1 rounded-full neu-flat bg-[var(--surface-color)] font-medium">${t.category || '-'}</span></td>
+                        <td class="px-4 py-3 text-xs font-semibold text-textMuted">${t.wallet || '-'}</td>
                         <td class="px-4 py-3 text-xs text-textMuted">${app.formatDate(t.date)}</td>
-                        <td class="px-4 py-3 text-right font-bold ${isInc ? 'text-green-500' : 'text-textMain'}">
-                            ${isInc ? '+' : '-'}${app.formatCur(t.amount)}
+                        <td class="px-4 py-3 text-right font-bold ${isInc ? 'text-green-500' : 'text-red-500'}">
+                            ${isInc ? '+' : '-'}${app.formatCur(amount)}
                         </td>
                     </tr>`;
                 }).join('');
-                document.getElementById('dash-transactions').innerHTML = recentTxHtml;
-                
+
+                document.getElementById('dash-transactions').innerHTML = recentTxHtml || `
+                    <tr><td colspan="5" class="px-4 py-8 text-center text-xs text-textMuted italic">Belum ada transaksi.</td></tr>
+                `;
+
                 document.getElementById('dash-income').innerText = app.formatCur(monthInc);
                 document.getElementById('dash-expense').innerText = app.formatCur(monthExp);
 
@@ -1819,7 +1948,7 @@
                 const id = document.getElementById('wallet-form-id').value;
                 const name = document.getElementById('wallet-form-name').value.trim();
                 const group = document.getElementById('wallet-form-group').value;
-                const balance = parseInt(document.getElementById('wallet-form-balance').value) || 0;
+                const balance = app.toNumber(document.getElementById('wallet-form-balance').value);
 
                 if (!name) return;
 
@@ -1978,7 +2107,7 @@
                     const tDate = new Date(t.date);
                     const matchMonth = tDate.getMonth() === selectedMonth;
                     const matchYear = tDate.getFullYear() === selectedYear;
-                    const matchWallet = matchedWalletIds.includes(t.wallet.toLowerCase());
+                    const matchWallet = matchedWalletIds.includes(String(t.wallet || '').toLowerCase());
                     return matchMonth && matchYear && matchWallet;
                 });
 
@@ -1989,11 +2118,11 @@
 
                 filtered.forEach(t => {
                     if (t.type === 'income') {
-                        totalIncome += t.amount;
-                        categoryBreakdownIncome[t.category] = (categoryBreakdownIncome[t.category] || 0) + t.amount;
+                        totalIncome += app.toNumber(t.amount);
+                        categoryBreakdownIncome[t.category] = (categoryBreakdownIncome[t.category] || 0) + app.toNumber(t.amount);
                     } else {
-                        totalExpense += t.amount;
-                        categoryBreakdownExpense[t.category] = (categoryBreakdownExpense[t.category] || 0) + t.amount;
+                        totalExpense += app.toNumber(t.amount);
+                        categoryBreakdownExpense[t.category] = (categoryBreakdownExpense[t.category] || 0) + app.toNumber(t.amount);
                     }
                 });
 
@@ -2578,13 +2707,13 @@
                 state.transactions.forEach(t => {
                     const tDate = new Date(t.date);
                     if (tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear()) {
-                        if (t.type === 'expense') {
+                        if (app.normalizeType(t.type) === 'expense') {
                             // Cek jika kategori belum ada di actualExpenses (misal ada di transaksi lama tapi sdh dihapus)
                             const cat = actualExpenses[t.category] !== undefined ? t.category : 'Other';
-                            actualExpenses[cat] = (actualExpenses[cat] || 0) + t.amount;
-                            totalActualSpent += t.amount;
-                        } else if (t.type === 'income') {
-                            totalIncomeThisMonth += t.amount;
+                            actualExpenses[cat] = (actualExpenses[cat] || 0) + app.toNumber(t.amount);
+                            totalActualSpent += app.toNumber(t.amount);
+                        } else if (app.normalizeType(t.type) === 'income') {
+                            totalIncomeThisMonth += app.toNumber(t.amount);
                         }
                     }
                 });
@@ -2821,6 +2950,7 @@
                 };
             },
 
+
             renderCashflowChart() {
                 const ctx = document.getElementById('cashflowChart');
                 if(!ctx) return;
@@ -2830,13 +2960,37 @@
                 Chart.defaults.color = cTheme.text;
                 Chart.defaults.font.family = "'Poppins', sans-serif";
 
+                const today = new Date();
+                const labels = [];
+                const dailyNet = [];
+
+                for (let i = 6; i >= 0; i--) {
+                    const day = new Date(today);
+                    day.setDate(today.getDate() - i);
+                    labels.push(day.toLocaleDateString('id-ID', { weekday: 'short' }));
+
+                    const net = state.transactions.reduce((sum, t) => {
+                        const txDate = this.parseDate(t.date);
+                        const sameDay = txDate.getFullYear() === day.getFullYear() &&
+                                        txDate.getMonth() === day.getMonth() &&
+                                        txDate.getDate() === day.getDate();
+
+                        if (!sameDay) return sum;
+
+                        const amount = this.toNumber(t.amount);
+                        return this.normalizeType(t.type) === 'income' ? sum + amount : sum - amount;
+                    }, 0);
+
+                    dailyNet.push(net);
+                }
+
                 state.charts.cashflow = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                        labels: labels,
                         datasets: [{
-                            label: 'Balance Trend',
-                            data: [5000000, 4800000, 5200000, 5100000, 6500000, 6100000, 10220000],
+                            label: 'Net Cashflow Harian',
+                            data: dailyNet,
                             borderColor: cTheme.primary,
                             backgroundColor: cTheme.primary + '33',
                             borderWidth: 3,
@@ -2850,9 +3004,19 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: (ctx) => 'Net: ' + app.formatCur(ctx.raw)
+                                }
+                            }
+                        },
                         scales: {
-                            y: { grid: { color: cTheme.grid, drawBorder: false }, ticks: { callback: v => 'Rp ' + (v/1000) + 'k' } },
+                            y: {
+                                grid: { color: cTheme.grid, drawBorder: false },
+                                ticks: { callback: v => app.formatCur(v) }
+                            },
                             x: { grid: { display: false, drawBorder: false } }
                         }
                     }
@@ -3016,8 +3180,8 @@
                 
                 const wIndex = state.wallets.findIndex(w => w.name.toLowerCase() === wallet.toLowerCase());
                 if(wIndex >= 0) {
-                    if(type === 'income') state.wallets[wIndex].balance += amount;
-                    else state.wallets[wIndex].balance -= amount;
+                    if(type === 'income') state.wallets[wIndex].balance = app.toNumber(state.wallets[wIndex].balance) + amount;
+                    else state.wallets[wIndex].balance = app.toNumber(state.wallets[wIndex].balance) - amount;
                 }
                 this.saveData();
 
@@ -3090,6 +3254,7 @@
             },
 
             // [BARU] Fungsi Tarik Data dari Google Sheets
+
             async syncFromCloud(isSilent = false) {
                 const scriptUrl = state.globalSettings.scriptUrl;
                 if (!scriptUrl) {
@@ -3105,27 +3270,67 @@
                         method: 'POST',
                         body: JSON.stringify({ action: 'getData' })
                     });
-                    const json = await res.json();
 
-                    // Backend lama mengirim {status:'success', data:{...}}.
-                    // Backend terbaru mengirim {status:'success', wallets:[...], transactions:[...]} langsung di root.
+                    const rawText = await res.text();
+                    let json = {};
+                    try {
+                        json = JSON.parse(rawText);
+                    } catch (parseErr) {
+                        throw new Error('Response Apps Script bukan JSON valid. Cek deployment /exec.');
+                    }
+
+                    // Backend lama: {status:'success', data:{...}}
+                    // Backend baru: {status:'success', wallets:[...], transactions:[...]}
                     const cloudData = json.data || json;
-                    
+
                     if(json.status === 'success' && cloudData) {
-                        state.wallets = cloudData.wallets || state.wallets;
-                        state.transactions = cloudData.transactions || state.transactions;
+                        if (Array.isArray(cloudData.wallets)) {
+                            state.wallets = cloudData.wallets.map(w => ({
+                                id: String(w.id ?? w.ID ?? w['ID Wallet'] ?? ('w' + Date.now())),
+                                name: String(w.name ?? w.Nama ?? w['Nama Wallet'] ?? 'Wallet'),
+                                balance: app.toNumber(w.balance ?? w.Saldo ?? 0),
+                                icon: w.icon || w.Icon || 'fa-wallet',
+                                color: w.color || w.Warna || 'text-blue-500',
+                                group: String(w.group || w.Group || 'pribadi').toLowerCase()
+                            }));
+                        }
+
+                        if (Array.isArray(cloudData.transactions)) {
+                            state.transactions = cloudData.transactions.map(t => ({
+                                id: String(t.id ?? t.ID ?? t['ID Transaksi'] ?? ('T' + Date.now())),
+                                date: t.date ?? t.Tanggal ?? new Date().toISOString(),
+                                desc: String(t.desc ?? t.Deskripsi ?? t.note ?? t.Catatan ?? '-'),
+                                category: String(t.category ?? t.Kategori ?? 'Other'),
+                                wallet: String(t.wallet ?? t.Wallet ?? 'Cash'),
+                                type: app.normalizeType(t.type ?? t.Tipe ?? 'expense'),
+                                amount: app.toNumber(t.amount ?? t.Nominal ?? 0)
+                            }));
+                        }
+
                         state.debts = cloudData.debts || state.debts;
                         state.categories = cloudData.categories || state.categories;
                         state.budgets = cloudData.budgets || state.budgets;
                         state.users = cloudData.users || state.users;
-                        
+
                         const dbSettings = cloudData.globalSettings;
                         if(dbSettings) {
                             if(!dbSettings.scriptUrl) dbSettings.scriptUrl = scriptUrl;
                             state.globalSettings = { ...state.globalSettings, ...dbSettings };
                         }
-                        
-                        // Simpan ke local storage tanpa memicu syncToCloud lagi (mencegah loop)
+
+                        // Pastikan activeWallets tetap cocok dengan wallet dari Sheet.
+                        const currentActive = Array.isArray(state.globalSettings.activeWallets) ? state.globalSettings.activeWallets : [];
+                        const walletIds = state.wallets.map(w => String(w.id));
+                        const walletNames = state.wallets.map(w => String(w.name));
+                        const hasMatchingActive = currentActive.some(id =>
+                            walletIds.includes(String(id)) || walletNames.includes(String(id))
+                        );
+
+                        if (!hasMatchingActive) {
+                            state.globalSettings.activeWallets = walletIds;
+                        }
+
+                        // Simpan ke localStorage tanpa memicu syncToCloud lagi.
                         localStorage.setItem('imers_transactions', JSON.stringify(state.transactions));
                         localStorage.setItem('imers_wallets', JSON.stringify(state.wallets));
                         localStorage.setItem('imers_debts', JSON.stringify(state.debts));
@@ -3133,13 +3338,17 @@
                         localStorage.setItem('imers_categories', JSON.stringify(state.categories));
                         localStorage.setItem('imers_users', JSON.stringify(state.users));
                         localStorage.setItem('imers_global_settings', JSON.stringify(state.globalSettings));
-                        
-                        // Render ulang UI
+
+                        // Render ulang UI setelah data Google Sheet masuk.
                         app.updateBrandingUI();
-                        app.updateHeader(); // Update sapaan dengan data Admin terbaru
+                        app.updateHeader();
+                        app.populateReportWalletDropdown();
                         if(!document.getElementById('view-dashboard').classList.contains('hidden')) app.renderDashboard();
+                        if(!document.getElementById('view-history').classList.contains('hidden')) app.renderHistory();
+                        if(!document.getElementById('view-analysis').classList.contains('hidden')) app.renderAnalysis();
                         if(!document.getElementById('view-users').classList.contains('hidden')) app.renderUsers();
-                        
+                        if(!document.getElementById('view-debt').classList.contains('hidden')) app.renderDebt();
+
                         if(!isSilent) {
                             const toast = document.createElement('div');
                             toast.className = "fixed bottom-5 right-5 glass border-l-4 border-[var(--primary-color)] p-4 shadow-2xl z-50 fade-in text-xs font-semibold text-textMain";
@@ -3151,6 +3360,7 @@
                         if(!isSilent) alert("Gagal menarik data: " + (json.message || "Unknown error"));
                     }
                 } catch (e) {
+                    console.error('syncFromCloud error:', e);
                     if(!isSilent) alert("Error koneksi ke Apps Script: " + e.message);
                 } finally {
                     if(btn) btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i>';
