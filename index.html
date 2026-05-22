@@ -1670,7 +1670,7 @@
                             </div>
                             <p class="text-xs font-bold text-textMain">${w.name}</p>
                         </div>
-                        <p class="font-bold text-xs text-textMain">${this.formatCur(w.balance)}</p>
+                        <p class="font-bold text-xs text-textMain">${app.formatCur(w.balance)}</p>
                     </div>`;
 
                     if(w.group === 'pribadi') { totPribadi += w.balance; htmlPribadi += itemHtml; }
@@ -1678,12 +1678,12 @@
                     else if(w.group === 'tabungan') { totTabungan += w.balance; htmlTabungan += itemHtml; }
                 });
 
-                document.getElementById('dash-total-balance').innerText = this.formatCur(totalBal);
-                document.getElementById('total-pribadi').innerText = this.formatCur(totPribadi);
+                document.getElementById('dash-total-balance').innerText = app.formatCur(totalBal);
+                document.getElementById('total-pribadi').innerText = app.formatCur(totPribadi);
                 document.getElementById('list-pribadi').innerHTML = htmlPribadi || '<p class="text-xs text-textMuted p-2">Belum ada wallet.</p>';
-                document.getElementById('total-bisnis').innerText = this.formatCur(totBisnis);
+                document.getElementById('total-bisnis').innerText = app.formatCur(totBisnis);
                 document.getElementById('list-bisnis').innerHTML = htmlBisnis || '<p class="text-xs text-textMuted p-2">Belum ada wallet.</p>';
-                document.getElementById('total-tabungan').innerText = this.formatCur(totTabungan);
+                document.getElementById('total-tabungan').innerText = app.formatCur(totTabungan);
                 document.getElementById('list-tabungan').innerHTML = htmlTabungan || '<p class="text-xs text-textMuted p-2">Belum ada wallet.</p>';
 
                 const recentTxHtml = state.transactions.slice(0, 5).map(t => {
@@ -1699,16 +1699,16 @@
                         <td class="px-4 py-3 font-bold text-textMain">${t.desc}</td>
                         <td class="px-4 py-3 text-xs"><span class="px-3 py-1 rounded-full neu-flat bg-[var(--surface-color)] font-medium">${t.category}</span></td>
                         <td class="px-4 py-3 text-xs font-semibold text-textMuted">${t.wallet}</td>
-                        <td class="px-4 py-3 text-xs text-textMuted">${this.formatDate(t.date)}</td>
+                        <td class="px-4 py-3 text-xs text-textMuted">${app.formatDate(t.date)}</td>
                         <td class="px-4 py-3 text-right font-bold ${isInc ? 'text-green-500' : 'text-textMain'}">
-                            ${isInc ? '+' : '-'}${this.formatCur(t.amount)}
+                            ${isInc ? '+' : '-'}${app.formatCur(t.amount)}
                         </td>
                     </tr>`;
                 }).join('');
                 document.getElementById('dash-transactions').innerHTML = recentTxHtml;
                 
-                document.getElementById('dash-income').innerText = this.formatCur(monthInc);
-                document.getElementById('dash-expense').innerText = this.formatCur(monthExp);
+                document.getElementById('dash-income').innerText = app.formatCur(monthInc);
+                document.getElementById('dash-expense').innerText = app.formatCur(monthExp);
 
                 this.renderCashflowChart();
             },
@@ -1985,9 +1985,9 @@
 
                 const balance = totalIncome - totalExpense;
 
-                document.getElementById('report-income-val').innerText = this.formatCur(totalIncome);
-                document.getElementById('report-expense-val').innerText = this.formatCur(totalExpense);
-                document.getElementById('report-balance-val').innerText = this.formatCur(balance);
+                document.getElementById('report-income-val').innerText = app.formatCur(totalIncome);
+                document.getElementById('report-expense-val').innerText = app.formatCur(totalExpense);
+                document.getElementById('report-balance-val').innerText = app.formatCur(balance);
 
                 const monthName = document.getElementById('report-month-select').options[selectedMonth].text;
                 document.getElementById('report-main-status-title').innerText = `Laporan Keuangan ${walletName}`;
@@ -2013,11 +2013,11 @@
                         const isInc = t.type === 'income';
                         return `
                         <tr class="border-b border-[var(--border-light)] hover:bg-[var(--hover-bg)] transition text-xs">
-                            <td class="px-4 py-3 whitespace-nowrap">${this.formatDate(t.date)}</td>
+                            <td class="px-4 py-3 whitespace-nowrap">${app.formatDate(t.date)}</td>
                             <td class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-[var(--surface-color)] font-semibold text-textMain">${t.category}</span></td>
                             <td class="px-4 py-3 font-semibold text-textMain">${t.desc}</td>
                             <td class="px-4 py-3 text-right font-bold ${isInc ? 'text-green-500' : 'text-textMain'} whitespace-nowrap">
-                                ${isInc ? '+' : '-'}${this.formatCur(t.amount)}
+                                ${isInc ? '+' : '-'}${app.formatCur(t.amount)}
                             </td>
                             <td class="px-4 py-3 text-textMuted font-bold">${t.wallet}</td>
                         </tr>`;
@@ -2055,7 +2055,7 @@
                     <div class="space-y-1">
                         <div class="flex justify-between items-center text-xs">
                             <span class="font-bold text-textMain">${cat}</span>
-                            <span class="font-bold text-textMain">${pct}% (${this.formatCur(val)})</span>
+                            <span class="font-bold text-textMain">${pct}% (${app.formatCur(val)})</span>
                         </div>
                         <div class="w-full h-2 bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
                             <div class="h-full ${barColor} rounded-full transition-all duration-1000" style="width: ${pct}%"></div>
@@ -2072,9 +2072,9 @@
                     notes.push("Belum ada data mutasi yang terekam pada filter terpilih.");
                 } else {
                     if (balance > 0) {
-                        notes.push(`🟢 Arus kas dalam keadaan <b>Surplus</b> sebesar <b>${this.formatCur(balance)}</b>. Portofolio keuangan Anda sehat.`);
+                        notes.push(`🟢 Arus kas dalam keadaan <b>Surplus</b> sebesar <b>${app.formatCur(balance)}</b>. Portofolio keuangan Anda sehat.`);
                     } else if (balance < 0) {
-                        notes.push(`🔴 Laporan mendeteksi adanya <b>Defisit</b> kas bersih sebesar <b>${this.formatCur(Math.abs(balance))}</b>. Lakukan pengetatan pengeluaran.`);
+                        notes.push(`🔴 Laporan mendeteksi adanya <b>Defisit</b> kas bersih sebesar <b>${app.formatCur(Math.abs(balance))}</b>. Lakukan pengetatan pengeluaran.`);
                     } else {
                         notes.push(`🟡 Arus kas dalam kondisi seimbang. Seluruh pemasukan habis terpakai tanpa sisa.`);
                     }
@@ -2082,12 +2082,12 @@
                     const categories = Object.keys(expenseBreakdown);
                     if (categories.length > 0) {
                         const topCat = categories.sort((a,b) => expenseBreakdown[b] - expenseBreakdown[a])[0];
-                        notes.push(`⚠️ Sektor pengeluaran terbesar jatuh pada kategori <b>${topCat}</b> dengan nominal <b>${this.formatCur(expenseBreakdown[topCat])}</b>.`);
+                        notes.push(`⚠️ Sektor pengeluaran terbesar jatuh pada kategori <b>${topCat}</b> dengan nominal <b>${app.formatCur(expenseBreakdown[topCat])}</b>.`);
                     }
                     
                     if (balance > 0) {
                         const savingSugg = Math.round(balance * 0.3);
-                        notes.push(`💡 Disarankan mengalihkan dana surplus minimal 30% (<b>${this.formatCur(savingSugg)}</b>) ke portofolio <b>Wallet Tabungan</b>.`);
+                        notes.push(`💡 Disarankan mengalihkan dana surplus minimal 30% (<b>${app.formatCur(savingSugg)}</b>) ke portofolio <b>Wallet Tabungan</b>.`);
                     }
                 }
 
@@ -2107,22 +2107,22 @@
                     const isInc = t.type === 'income';
                     return `
                     <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
-                        <td style="padding: 10px; text-align: left;">${this.formatDate(t.date)}</td>
+                        <td style="padding: 10px; text-align: left;">${app.formatDate(t.date)}</td>
                         <td style="padding: 10px; text-align: left;">${t.category}</td>
                         <td style="padding: 10px; text-align: left; font-weight: bold;">${t.desc}</td>
                         <td style="padding: 10px; text-align: right; font-weight: bold; color: ${isInc ? '#10b981' : '#2b3648'};">
-                            ${isInc ? '+' : '-'}${this.formatCur(t.amount)}
+                            ${isInc ? '+' : '-'}${app.formatCur(t.amount)}
                         </td>
                         <td style="padding: 10px; text-align: left;">${t.wallet}</td>
                     </tr>`;
                 }).join('');
 
                 const breakdownIncomeRows = Object.keys(r.incomeBreakdown).map(cat => {
-                    return `<li><strong>${cat}</strong>: ${this.formatCur(r.incomeBreakdown[cat])}</li>`;
+                    return `<li><strong>${cat}</strong>: ${app.formatCur(r.incomeBreakdown[cat])}</li>`;
                 }).join('') || "<li>Tidak ada pemasukan</li>";
 
                 const breakdownExpenseRows = Object.keys(r.expenseBreakdown).map(cat => {
-                    return `<li><strong>${cat}</strong>: ${this.formatCur(r.expenseBreakdown[cat])}</li>`;
+                    return `<li><strong>${cat}</strong>: ${app.formatCur(r.expenseBreakdown[cat])}</li>`;
                 }).join('') || "<li>Tidak ada pengeluaran</li>";
 
                 printWindow.document.write(`
@@ -2171,15 +2171,15 @@
                     <div class="summary-grid">
                         <div class="card" style="border-left: 4px solid #10b981;">
                             <p>Total Pemasukan</p>
-                            <h3 style="color: #10b981;">${this.formatCur(r.totalIncome)}</h3>
+                            <h3 style="color: #10b981;">${app.formatCur(r.totalIncome)}</h3>
                         </div>
                         <div class="card" style="border-left: 4px solid #ef4444;">
                             <p>Total Pengeluaran</p>
-                            <h3 style="color: #ef4444;">${this.formatCur(r.totalExpense)}</h3>
+                            <h3 style="color: #ef4444;">${app.formatCur(r.totalExpense)}</h3>
                         </div>
                         <div class="card" style="border-left: 4px solid #00a8cc;">
                             <p>Kas Bersih / Balance</p>
-                            <h3 style="color: #00a8cc;">${this.formatCur(r.balance)}</h3>
+                            <h3 style="color: #00a8cc;">${app.formatCur(r.balance)}</h3>
                         </div>
                     </div>
 
@@ -2299,7 +2299,7 @@
                                 <h3 class="font-bold text-sm text-textMain">${catName}</h3>
                                 ${type === 'expense' ? `
                                     <p class="text-[10px] text-textMuted mt-1">
-                                        Budget: <span class="font-semibold text-textMain">${budgetVal > 0 ? this.formatCur(budgetVal) : 'Tanpa Batas (Rp 0)'}</span>
+                                        Budget: <span class="font-semibold text-textMain">${budgetVal > 0 ? app.formatCur(budgetVal) : 'Tanpa Batas (Rp 0)'}</span>
                                     </p>
                                 ` : ''}
                             </div>
@@ -2500,11 +2500,11 @@
                     const isInc = t.type === 'income';
                     return `
                     <tr class="border-b border-[var(--border-light)] hover:bg-[var(--hover-bg)] transition group text-xs">
-                        <td class="px-4 py-4 font-medium whitespace-nowrap">${this.formatDate(t.date)}</td>
+                        <td class="px-4 py-4 font-medium whitespace-nowrap">${app.formatDate(t.date)}</td>
                         <td class="px-4 py-4"><span class="px-3 py-1.5 rounded neu-flat bg-[var(--surface-color)] font-medium shadow-sm">${t.category}</span></td>
                         <td class="px-4 py-4 font-bold text-textMain">${t.desc}</td>
                         <td class="px-4 py-4 text-right font-bold ${isInc ? 'text-green-500' : 'text-textMain'} whitespace-nowrap">
-                            ${isInc ? '+' : '-'}${this.formatCur(t.amount)}
+                            ${isInc ? '+' : '-'}${app.formatCur(t.amount)}
                         </td>
                         <td class="px-4 py-4 font-semibold text-textMuted whitespace-nowrap">${t.wallet}</td>
                     </tr>`;
@@ -2580,8 +2580,8 @@
                     totalBudget += state.budgets[cat];
                 });
 
-                document.getElementById('total-spent-analysis').innerText = this.formatCur(totalActualSpent);
-                document.getElementById('total-budget-analysis').innerText = this.formatCur(totalBudget);
+                document.getElementById('total-spent-analysis').innerText = app.formatCur(totalActualSpent);
+                document.getElementById('total-budget-analysis').innerText = app.formatCur(totalBudget);
 
                 const globalPct = totalBudget > 0 ? Math.min(Math.round((totalActualSpent / totalBudget) * 100), 100) : 0;
                 const progressBar = document.getElementById('global-budget-progress-bar');
@@ -2613,7 +2613,7 @@
 
                 const worstPctOfTotal = totalActualSpent > 0 ? Math.round((worstCost / totalActualSpent) * 100) : 0;
                 document.getElementById('worst-category-name').innerText = worstCategory;
-                document.getElementById('worst-category-cost').innerText = this.formatCur(worstCost);
+                document.getElementById('worst-category-cost').innerText = app.formatCur(worstCost);
                 document.getElementById('worst-category-pct').innerText = `Menyerap ${worstPctOfTotal}% dari seluruh pengeluaran bulan ini.`;
 
                 const netCashflow = totalIncomeThisMonth - totalActualSpent;
@@ -2626,13 +2626,13 @@
                     statusIconEl.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
                     statusTextEl.innerText = "Arus Kas Surplus";
                     statusTextEl.className = "font-bold text-sm text-green-500";
-                    statusDescEl.innerText = `Sisa kas bersih bulan ini sebesar ${this.formatCur(netCashflow)} dapat dialihkan ke Wallet Tabungan Anda.`;
+                    statusDescEl.innerText = `Sisa kas bersih bulan ini sebesar ${app.formatCur(netCashflow)} dapat dialihkan ke Wallet Tabungan Anda.`;
                 } else if (netCashflow < 0) {
                     statusIconEl.className = "w-8 h-8 rounded-full flex items-center justify-center text-red-500 bg-red-500/10";
                     statusIconEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
                     statusTextEl.innerText = "Arus Kas Defisit";
                     statusTextEl.className = "font-bold text-sm text-red-500";
-                    statusDescEl.innerText = `Pengeluaran Anda melebihi pemasukan bulan ini sebesar ${this.formatCur(Math.abs(netCashflow))}. Harap lakukan rem darurat!`;
+                    statusDescEl.innerText = `Pengeluaran Anda melebihi pemasukan bulan ini sebesar ${app.formatCur(Math.abs(netCashflow))}. Harap lakukan rem darurat!`;
                 } else {
                     statusIconEl.className = "w-8 h-8 rounded-full flex items-center justify-center text-blue-500 bg-blue-500/10";
                     statusIconEl.innerHTML = '<i class="fa-solid fa-scale-balanced"></i>';
@@ -2669,16 +2669,16 @@
                     if (budget === 0) {
                         diffText = `Unbudgeted pengeluaran.`;
                     } else if (isOverBudget) {
-                        diffText = `Over budget ${this.formatCur(actual - budget)}`;
+                        diffText = `Over budget ${app.formatCur(actual - budget)}`;
                     } else {
-                        diffText = `Sisa kuota ${this.formatCur(budget - actual)}`;
+                        diffText = `Sisa kuota ${app.formatCur(budget - actual)}`;
                     }
 
                     return `
                     <div class="space-y-1">
                         <div class="flex justify-between items-center text-xs">
                             <span class="font-bold text-textMain">${cat}</span>
-                            <span class="${textColor}">${budget > 0 ? `${pct}% (${this.formatCur(actual)} / ${this.formatCur(budget)})` : this.formatCur(actual)}</span>
+                            <span class="${textColor}">${budget > 0 ? `${pct}% (${app.formatCur(actual)} / ${app.formatCur(budget)})` : app.formatCur(actual)}</span>
                         </div>
                         <div class="w-full h-2 bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
                             <div class="h-full ${barColor} rounded-full transition-all duration-1000" style="width: ${budget > 0 ? Math.min(pct, 100) : (actual > 0 ? 100 : 0)}%"></div>
@@ -2701,15 +2701,15 @@
                     
                     if (worstCategory !== "Belum Ada") {
                         if (worstCategory.toLowerCase().includes('food')) {
-                            adviceList.push(`🍔 Kategori <b>${worstCategory}</b> adalah pos pengeluaran terbesar Anda (${this.formatCur(worstCost)}). Pertimbangkan memasak di rumah atau batasi intensitas jajan di luar (dine-out) hingga akhir bulan ini.`);
+                            adviceList.push(`🍔 Kategori <b>${worstCategory}</b> adalah pos pengeluaran terbesar Anda (${app.formatCur(worstCost)}). Pertimbangkan memasak di rumah atau batasi intensitas jajan di luar (dine-out) hingga akhir bulan ini.`);
                         } else if (worstCategory.toLowerCase().includes('bill')) {
-                            adviceList.push(`⚡ Tagihan (<b>${worstCategory}</b>) menyedot anggaran bulanan Anda sebesar ${this.formatCur(worstCost)}. Coba lakukan audit langganan bulanan digital Anda yang kurang aktif, atau hemat penggunaan energi listrik di rumah.`);
+                            adviceList.push(`⚡ Tagihan (<b>${worstCategory}</b>) menyedot anggaran bulanan Anda sebesar ${app.formatCur(worstCost)}. Coba lakukan audit langganan bulanan digital Anda yang kurang aktif, atau hemat penggunaan energi listrik di rumah.`);
                         } else if (worstCategory.toLowerCase().includes('transport')) {
-                            adviceList.push(`🚗 Pos <b>${worstCategory}</b> adalah pengeluaran utama Anda bulan ini (${this.formatCur(worstCost)}). Cari alternatif rute perjalanan, manfaatkan promo ojek online, atau optimalkan perjalanan bersama.`);
+                            adviceList.push(`🚗 Pos <b>${worstCategory}</b> adalah pengeluaran utama Anda bulan ini (${app.formatCur(worstCost)}). Cari alternatif rute perjalanan, manfaatkan promo ojek online, atau optimalkan perjalanan bersama.`);
                         } else if (worstCategory.toLowerCase().includes('business')) {
-                            adviceList.push(`📈 Pengeluaran operasional <b>${worstCategory}</b> menempati porsi terbesar (${this.formatCur(worstCost)}). Pastikan pengeluaran ini memiliki ROI (Return on Investment) yang jelas dan kurangi biaya overhead yang tidak perlu.`);
+                            adviceList.push(`📈 Pengeluaran operasional <b>${worstCategory}</b> menempati porsi terbesar (${app.formatCur(worstCost)}). Pastikan pengeluaran ini memiliki ROI (Return on Investment) yang jelas dan kurangi biaya overhead yang tidak perlu.`);
                         } else {
-                            adviceList.push(`📦 Pengeluaran <b>${worstCategory}</b> merupakan pos paling boros bulan ini (${this.formatCur(worstCost)}). Lakukan filter ulang mana yang benar-benar kebutuhan utama (needs) dan mana yang sekedar keinginan (wants).`);
+                            adviceList.push(`📦 Pengeluaran <b>${worstCategory}</b> merupakan pos paling boros bulan ini (${app.formatCur(worstCost)}). Lakukan filter ulang mana yang benar-benar kebutuhan utama (needs) dan mana yang sekedar keinginan (wants).`);
                         }
                     }
 
@@ -3013,7 +3013,7 @@
                                    .replace(/{type}/g, type === 'income' ? 'Pemasukan' : 'Pengeluaran')
                                    .replace(/{category}/g, category)
                                    .replace(/{note}/g, newTx.desc)
-                                   .replace(/{amount}/g, this.formatCur(amount));
+                                   .replace(/{amount}/g, app.formatCur(amount));
                 
                 // Convert line breaks to HTML breaks
                 replyTpl = replyTpl.replace(/\n/g, '<br>');
@@ -3424,30 +3424,30 @@
                         
                         <div class="flex justify-between mb-2 text-xs">
                             <span class="text-textMuted">Tanggal Pinjam</span>
-                            <span class="font-semibold text-textMain">${this.formatDate(d.startDate)}</span>
+                            <span class="font-semibold text-textMain">${app.formatDate(d.startDate)}</span>
                         </div>
                         <div class="flex justify-between mb-3 text-xs">
                             <span class="text-textMuted text-red-500 font-medium">Jatuh Tempo</span>
-                            <span class="font-bold text-red-500">${this.formatDate(d.dueDate)}</span>
+                            <span class="font-bold text-red-500">${app.formatDate(d.dueDate)}</span>
                         </div>
 
                         <div class="flex justify-between mb-2 text-sm border-t border-[var(--border-light)] pt-3">
                             <span class="text-textMuted">Total ${badgeText}</span>
-                            <span class="font-bold text-textMain">${this.formatCur(d.total)}</span>
+                            <span class="font-bold text-textMain">${app.formatCur(d.total)}</span>
                         </div>
                         <div class="flex justify-between mb-2 text-sm">
                             <span class="text-textMuted">Sudah Bayar</span>
-                            <span class="font-bold text-green-500">${this.formatCur(d.paid)}</span>
+                            <span class="font-bold text-green-500">${app.formatCur(d.paid)}</span>
                         </div>
                         <div class="flex justify-between mb-2 text-sm">
                             <span class="text-textMuted">Sisa</span>
-                            <span class="font-bold text-red-500">${this.formatCur(sisa)}</span>
+                            <span class="font-bold text-red-500">${app.formatCur(sisa)}</span>
                         </div>
                         
                         ${d.installment > 0 ? `
                         <div class="flex justify-between mb-4 text-xs font-semibold bg-gray-500/5 p-2 rounded-lg">
                             <span class="text-textMuted">Cicilan / Bulan</span>
-                            <span class="text-[var(--primary-color)]">${this.formatCur(d.installment)}</span>
+                            <span class="text-[var(--primary-color)]">${app.formatCur(d.installment)}</span>
                         </div>` : ''}
 
                         <div class="mt-auto pt-2">
@@ -3487,9 +3487,9 @@
                 let textTemplate = "";
 
                 if(d.type === 'receivable') {
-                    textTemplate = `Halo ${d.name}, sekadar mengingatkan terkait pinjaman piutang sebesar ${this.formatCur(d.total)}, saat ini sisa tagihan Anda adalah ${this.formatCur(sisa)} dengan tanggal jatuh tempo s.d ${this.formatDate(d.dueDate)}. Pembayaran cicilan bisa ditransfer ke rekening BCA kami ya Bosku. Terima kasih banyak atas pengertiannya. 🙏`;
+                    textTemplate = `Halo ${d.name}, sekadar mengingatkan terkait pinjaman piutang sebesar ${app.formatCur(d.total)}, saat ini sisa tagihan Anda adalah ${app.formatCur(sisa)} dengan tanggal jatuh tempo s.d ${app.formatDate(d.dueDate)}. Pembayaran cicilan bisa ditransfer ke rekening BCA kami ya Bosku. Terima kasih banyak atas pengertiannya. 🙏`;
                 } else {
-                    textTemplate = `Halo ${d.name}, mengabarkan terkait kewajiban hutang kami sebesar ${this.formatCur(d.total)}, saat ini sisa pinjaman kami adalah ${this.formatCur(sisa)}. Pembayaran cicilan berikutnya jatuh tempo pada ${this.formatDate(d.dueDate)} dan akan segera kami setorkan kembali tepat waktu. Terima kasih banyak atas kerjasamanya. 🙏`;
+                    textTemplate = `Halo ${d.name}, mengabarkan terkait kewajiban hutang kami sebesar ${app.formatCur(d.total)}, saat ini sisa pinjaman kami adalah ${app.formatCur(sisa)}. Pembayaran cicilan berikutnya jatuh tempo pada ${app.formatDate(d.dueDate)} dan akan segera kami setorkan kembali tepat waktu. Terima kasih banyak atas kerjasamanya. 🙏`;
                 }
 
                 const dummyInput = document.createElement("textarea");
@@ -3553,10 +3553,10 @@
                     tbody.innerHTML = payments.map(p => {
                         return `
                         <tr class="border-b border-[var(--border-light)] hover:bg-[var(--hover-bg)] transition text-xs">
-                            <td class="px-4 py-3 font-medium whitespace-nowrap">${this.formatDate(p.date)}</td>
+                            <td class="px-4 py-3 font-medium whitespace-nowrap">${app.formatDate(p.date)}</td>
                             <td class="px-4 py-3 font-semibold text-textMain">${p.note || 'Cicilan Tanpa Catatan'}</td>
                             <td class="px-4 py-3 text-right font-bold text-green-500 whitespace-nowrap">
-                                ${this.formatCur(p.amount)}
+                                ${app.formatCur(p.amount)}
                             </td>
                         </tr>`;
                     }).join('');
@@ -3576,7 +3576,7 @@
                     const d = state.debts[debtIndex];
                     const sisa = d.total - d.paid;
                     if(amount > sisa) {
-                        alert(`Nominal pembayaran melebihi sisa kewajiban (${this.formatCur(sisa)}).`);
+                        alert(`Nominal pembayaran melebihi sisa kewajiban (${app.formatCur(sisa)}).`);
                         return;
                     }
 
@@ -3613,10 +3613,10 @@
                     return `
                     <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
                         <td style="padding: 10px; text-align: left;">Cicilan Ke-${idx+1}</td>
-                        <td style="padding: 10px; text-align: left;">${this.formatDate(p.date)}</td>
+                        <td style="padding: 10px; text-align: left;">${app.formatDate(p.date)}</td>
                         <td style="padding: 10px; text-align: left;">${p.note || 'Pembayaran Cicilan'}</td>
                         <td style="padding: 10px; text-align: right; font-weight: bold; color: #10b981;">
-                            ${this.formatCur(p.amount)}
+                            ${app.formatCur(p.amount)}
                         </td>
                     </tr>`;
                 }).join('');
@@ -3679,10 +3679,10 @@
                         <div>
                             <p><strong>Nama Klien/Peminjam:</strong> ${d.name}</p>
                             <p><strong>Status:</strong> ${d.type === 'payable' ? 'Saya Berhutang' : 'Klien Berhutang'}</p>
-                            <p><strong>Tanggal Pinjam:</strong> ${this.formatDate(d.startDate)}</p>
+                            <p><strong>Tanggal Pinjam:</strong> ${app.formatDate(d.startDate)}</p>
                         </div>
                         <div style="text-align: right;">
-                            <p><strong>Batas Jatuh Tempo:</strong> ${this.formatDate(d.dueDate)}</p>
+                            <p><strong>Batas Jatuh Tempo:</strong> ${app.formatDate(d.dueDate)}</p>
                             <p><strong>Dicetak oleh:</strong> Reseller Admin ( Terry Katar )</p>
                             <p><strong>Tanggal Cetak:</strong> ${new Date().toLocaleDateString('id-ID')}</p>
                         </div>
@@ -3704,15 +3704,15 @@
                     <div class="balance-section">
                         <div class="balance-row">
                             <span>Kewajiban Pokok Awal:</span>
-                            <span style="font-weight: bold;">${this.formatCur(d.total)}</span>
+                            <span style="font-weight: bold;">${app.formatCur(d.total)}</span>
                         </div>
                         <div class="balance-row">
                             <span>Total Cicilan Dibayar:</span>
-                            <span style="font-weight: bold; color:#10b981;">-${this.formatCur(d.paid)}</span>
+                            <span style="font-weight: bold; color:#10b981;">-${app.formatCur(d.paid)}</span>
                         </div>
                         <div class="balance-row" style="border-top:1px solid #cbd5e1; padding-top:5px; margin-top:5px; font-size:14px; font-weight:bold;">
                             <span>Sisa Saldo:</span>
-                            <span style="color:${isLunas ? '#10b981' : '#ef4444'};">${this.formatCur(sisa)}</span>
+                            <span style="color:${isLunas ? '#10b981' : '#ef4444'};">${app.formatCur(sisa)}</span>
                         </div>
                     </div>
                     <div class="signature-section">
