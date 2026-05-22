@@ -1612,7 +1612,13 @@
             },
 
             logout() {
-                return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
+                localStorage.removeItem('imers_auth');
+                this.currentPin = '';
+                const authView = document.getElementById('view-auth');
+                const appContainer = document.getElementById('app-container');
+                if (appContainer) appContainer.classList.add('hidden');
+                if (authView) authView.classList.remove('hidden');
+                this.updatePinDisplay();
             },
             
             formatDate(isoString) {
@@ -3061,13 +3067,26 @@
             async syncToCloud() {
                 const scriptUrl = state.globalSettings.scriptUrl;
                 if (!scriptUrl) return;
+
+                // Kirim state yang aman saja. Jangan kirim Chart.js object karena bisa bikin JSON.stringify gagal.
+                const cloudState = {
+                    wallets: state.wallets,
+                    transactions: state.transactions,
+                    debts: state.debts,
+                    budgets: state.budgets,
+                    categories: state.categories,
+                    users: state.users,
+                    globalSettings: state.globalSettings
+                };
                 
                 try {
                     fetch(scriptUrl, {
                         method: 'POST',
-                        body: JSON.stringify({ action: 'syncData', state: state })
+                        body: JSON.stringify({ action: 'syncData', state: cloudState })
                     }).catch(err => console.log('Sync to cloud error:', err));
-                } catch(e) {}
+                } catch(e) {
+                    console.log('Sync to cloud error:', e);
+                }
             },
 
             // [BARU] Fungsi Tarik Data dari Google Sheets
@@ -3087,16 +3106,20 @@
                         body: JSON.stringify({ action: 'getData' })
                     });
                     const json = await res.json();
+
+                    // Backend lama mengirim {status:'success', data:{...}}.
+                    // Backend terbaru mengirim {status:'success', wallets:[...], transactions:[...]} langsung di root.
+                    const cloudData = json.data || json;
                     
-                    if(json.status === 'success' && json.data) {
-                        state.wallets = json.data.wallets || state.wallets;
-                        state.transactions = json.data.transactions || state.transactions;
-                        state.debts = json.data.debts || state.debts;
-                        state.categories = json.data.categories || state.categories;
-                        state.budgets = json.data.budgets || state.budgets;
-                        state.users = json.data.users || state.users;
+                    if(json.status === 'success' && cloudData) {
+                        state.wallets = cloudData.wallets || state.wallets;
+                        state.transactions = cloudData.transactions || state.transactions;
+                        state.debts = cloudData.debts || state.debts;
+                        state.categories = cloudData.categories || state.categories;
+                        state.budgets = cloudData.budgets || state.budgets;
+                        state.users = cloudData.users || state.users;
                         
-                        const dbSettings = json.data.globalSettings;
+                        const dbSettings = cloudData.globalSettings;
                         if(dbSettings) {
                             if(!dbSettings.scriptUrl) dbSettings.scriptUrl = scriptUrl;
                             state.globalSettings = { ...state.globalSettings, ...dbSettings };
