@@ -120,7 +120,7 @@
             display: none;
         }
 
-        /* Brand logoUrl: keep uploaded transparent PNG clean without blue wrapper */
+        /* Brand logo: keep uploaded transparent PNG clean without blue wrapper */
         .brand-logo-frame {
             background: transparent !important;
             box-shadow: none !important;
@@ -1196,8 +1196,8 @@
                                     <!-- NEW: Apps Script Web App URL -->
                                     <div class="space-y-1 border-t border-[var(--border-light)] pt-4 mt-2">
                                         <label class="text-[10px] font-bold text-[var(--primary-color)] uppercase tracking-wider">Apps Script Web App URL</label>
-                                        <input type="url" id="cfg-script-url" value="https://script.google.com/macros/s/AKfycbyevlgaqpHnk6d7ViT4OS5L2HiSozOvZQdDUubWmqcI208q4fiu784D3AMlqIBI6Xbxzg/exec" readonly class="w-full neu-pressed px-4 py-2.5 rounded-xl bg-[var(--surface-color)] text-sm outline-none text-textMuted border border-[var(--primary-color)]/30 cursor-not-allowed opacity-80">
-                                        <p class="text-[10px] text-textMuted mt-1">URL sudah hardcode di index.html. Browser/device baru langsung konek realtime tanpa perlu setting ulang.</p>
+                                        <input type="url" id="cfg-script-url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full neu-pressed px-4 py-2.5 rounded-xl bg-[var(--surface-color)] text-sm outline-none text-textMain border border-[var(--primary-color)]/30 focus:ring-1 focus:ring-[var(--primary-color)] transition">
+                                        <p class="text-[10px] text-textMuted mt-1">URL ini diperlukan untuk automasi laporan email dan sinkronisasi data sheet.</p>
                                     </div>
 
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-[var(--border-light)] pt-4 mt-2">
@@ -1521,9 +1521,10 @@
     </div>
 
     <script>
-        // --- HARDCORE APPS SCRIPT ENDPOINT ---
-        let CLOUD_LOADED = false;
+        // --- HARDCORE CLOUD CONFIG ---
         const HARDCORE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyevlgaqpHnk6d7ViT4OS5L2HiSozOvZQdDUubWmqcI208q4fiu784D3AMlqIBI6Xbxzg/exec";
+        let CLOUD_LOADED = false;
+        let CLOUD_LOADING = false;
 
         // --- APP STATE & MOCK DATA ---
         const INITIAL_WALLETS = [
@@ -1611,14 +1612,11 @@
             wallets: JSON.parse(localStorage.getItem('imers_wallets')) || [],
             transactions: JSON.parse(localStorage.getItem('imers_transactions')) || [],
             debts: JSON.parse(localStorage.getItem('imers_debts')) || [],
-            budgets: JSON.parse(localStorage.getItem('imers_budgets')) || INITIAL_BUDGETS,
+            budgets: JSON.parse(localStorage.getItem('imers_budgets')) || {},
             // Categories structure: { name: type ('expense'/'income') }
-            categories: JSON.parse(localStorage.getItem('imers_categories')) || {
-                'Food': 'expense', 'Bills': 'expense', 'Transport': 'expense', 'Business': 'expense', 'Other': 'expense',
-                'Salary': 'income', 'Business Profit': 'income', 'Other Income': 'income'
-            },
-            users: JSON.parse(localStorage.getItem('imers_users')) || INITIAL_USERS,
-            globalSettings: { ...INITIAL_GLOBAL_SETTINGS },
+            categories: JSON.parse(localStorage.getItem('imers_categories')) || {},
+            users: JSON.parse(localStorage.getItem('imers_users')) || [],
+            globalSettings: JSON.parse(localStorage.getItem('imers_global_settings')) || INITIAL_GLOBAL_SETTINGS,
             theme: localStorage.getItem('imers_theme') || 'soft',
             charts: {},
             generatedReport: null,
@@ -1627,9 +1625,6 @@
 
         // Normalize persisted settings so older localStorage data does not break new features.
         state.globalSettings = { ...INITIAL_GLOBAL_SETTINGS, ...(state.globalSettings || {}) };
-
-        // Semua branding/settings sekarang cloud-first dari Google Sheet
-        // bukan dari localStorage browser.
         state.globalSettings.scriptUrl = HARDCORE_SCRIPT_URL;
         if (!Array.isArray(state.globalSettings.activeWallets) || state.globalSettings.activeWallets.length === 0) {
             state.globalSettings.activeWallets = INITIAL_GLOBAL_SETTINGS.activeWallets.slice();
@@ -1640,12 +1635,131 @@
             currentPin: '',
             realtimeSyncTimer: null,
 
+            getScriptUrl() {
+                return HARDCORE_SCRIPT_URL;
+            },
+
+            parseJsonMaybe(value, fallback) {
+                if (value === undefined || value === null || value === '') return fallback;
+                if (typeof value !== 'string') return value;
+                try { return JSON.parse(value); } catch(e) { return fallback; }
+            },
+
+            sheetSettingsToObject(rowsOrObject) {
+                if (!rowsOrObject) return {};
+                if (!Array.isArray(rowsOrObject)) return { ...rowsOrObject };
+
+                const obj = {};
+                rowsOrObject.forEach(row => {
+                    const key = row.key ?? row.Key ?? row["Kunci Pengatur"] ?? row["Kunci Pengaturan"] ?? row[0];
+                    const val = row.value ?? row.Value ?? row["Nilai (Value)"] ?? row.Nilai ?? row[1];
+                    if (!key) return;
+                    obj[String(key).trim()] = val;
+                });
+                return obj;
+            },
+
+            normalizeSettings(rawSettings = {}) {
+                const s = this.sheetSettingsToObject(rawSettings);
+                return {
+                    ...INITIAL_GLOBAL_SETTINGS,
+                    ...state.globalSettings,
+                    brandName: s.brandName ?? s.brand ?? state.globalSettings.brandName ?? INITIAL_GLOBAL_SETTINGS.brandName,
+                    logoUrl: s.logoUrl ?? s.logoURL ?? s.logo ?? state.globalSettings.logoUrl ?? '',
+                    pin: String(s.pin ?? state.globalSettings.pin ?? INITIAL_GLOBAL_SETTINGS.pin),
+                    waGateway: s.waGateway ?? state.globalSettings.waGateway ?? 'fonnte',
+                    waToken: s.waToken ?? state.globalSettings.waToken ?? '',
+                    waNumber: s.waNumber ?? state.globalSettings.waNumber ?? '',
+                    scriptUrl: HARDCORE_SCRIPT_URL,
+                    reportEmail: s.reportEmail ?? state.globalSettings.reportEmail ?? '',
+                    reportFreq: s.reportFreq ?? state.globalSettings.reportFreq ?? 'weekly',
+                    enableBudgeting: String(s.enableBudgeting ?? state.globalSettings.enableBudgeting ?? 'true').toLowerCase() !== 'false',
+                    activeWallets: this.parseJsonMaybe(s.activeWallets, state.globalSettings.activeWallets || []),
+                    tplSuccess: s.tplSuccess ?? state.globalSettings.tplSuccess ?? INITIAL_GLOBAL_SETTINGS.tplSuccess,
+                    tplNearbudget: s.tplNearbudget ?? state.globalSettings.tplNearbudget ?? INITIAL_GLOBAL_SETTINGS.tplNearbudget,
+                    tplOverbudget: s.tplOverbudget ?? state.globalSettings.tplOverbudget ?? INITIAL_GLOBAL_SETTINGS.tplOverbudget,
+                    tplReport: s.tplReport ?? state.globalSettings.tplReport ?? INITIAL_GLOBAL_SETTINGS.tplReport,
+                    tutorialContent: s.tutorialContent ?? state.globalSettings.tutorialContent ?? ''
+                };
+            },
+
+            normalizeWallets(list) {
+                if (!Array.isArray(list)) return [];
+                return list.map((w, i) => ({
+                    id: String(w.id ?? w.ID ?? w["ID Wallet"] ?? w["ID"] ?? `w${i+1}`),
+                    name: String(w.name ?? w.Nama ?? w["Nama Wallet"] ?? w["Wallet"] ?? "Wallet"),
+                    balance: this.toNumber(w.balance ?? w.Saldo ?? 0),
+                    icon: w.icon ?? w.Icon ?? "fa-wallet",
+                    color: w.color ?? w.Warna ?? "text-blue-500",
+                    group: String(w.group ?? w.Group ?? "pribadi").toLowerCase()
+                }));
+            },
+
+            normalizeTransactions(list) {
+                if (!Array.isArray(list)) return [];
+                return list.map((t, i) => ({
+                    id: String(t.id ?? t.ID ?? t["ID Transaksi"] ?? `T${i+1}`),
+                    date: t.date ?? t.Tanggal ?? new Date().toISOString(),
+                    desc: String(t.desc ?? t.Deskripsi ?? t.note ?? t.Catatan ?? "-"),
+                    category: String(t.category ?? t.Kategori ?? "Other"),
+                    wallet: String(t.wallet ?? t.Wallet ?? "Cash"),
+                    type: this.normalizeType(t.type ?? t.Tipe ?? "expense"),
+                    amount: this.toNumber(t.amount ?? t.Nominal ?? 0)
+                }));
+            },
+
+            normalizeDebts(list) {
+                if (!Array.isArray(list)) return [];
+                return list.map((d, i) => ({
+                    id: String(d.id ?? d.ID ?? `d${i+1}`),
+                    name: String(d.name ?? d.Nama ?? "-"),
+                    type: d.type ?? d.Tipe ?? "payable",
+                    total: this.toNumber(d.total ?? d["Total Hutang/Piutang"] ?? d.Total ?? 0),
+                    paid: this.toNumber(d.paid ?? d.Dibayar ?? 0),
+                    startDate: d.startDate ?? d["Tgl Pinjam"] ?? "",
+                    dueDate: d.dueDate ?? d["Jatuh Tempo"] ?? "",
+                    installment: this.toNumber(d.installment ?? d.Cicilan ?? 0),
+                    payments: this.parseJsonMaybe(d.payments ?? d["Histori Pembayaran (JSON)"], [])
+                }));
+            },
+
+            normalizeCategories(listOrObject, budgetObject = {}) {
+                const categories = {};
+                const budgets = {};
+                if (Array.isArray(listOrObject)) {
+                    listOrObject.forEach(r => {
+                        const name = r.name ?? r["Nama Kategori"] ?? r.Kategori ?? r[0];
+                        if (!name) return;
+                        categories[String(name)] = String(r.type ?? r.Tipe ?? "expense").toLowerCase();
+                        budgets[String(name)] = this.toNumber(r.budget ?? r["Batas Budget"] ?? r.Budget ?? 0);
+                    });
+                    return { categories, budgets };
+                }
+                return {
+                    categories: listOrObject && typeof listOrObject === 'object' ? listOrObject : {},
+                    budgets: budgetObject && typeof budgetObject === 'object' ? budgetObject : {}
+                };
+            },
+
+            normalizeUsers(list) {
+                if (!Array.isArray(list)) return [];
+                return list.map((u, i) => ({
+                    id: String(u.id ?? u.ID ?? `u${i+1}`),
+                    name: String(u.name ?? u.Nama ?? "User"),
+                    phone: String(u.phone ?? u.WhatsApp ?? u.WA ?? ""),
+                    email: String(u.email ?? u.Email ?? ""),
+                    role: String(u.role ?? u.Role ?? "User"),
+                    defaultWallet: String(u.defaultWallet ?? u["Default Wallet"] ?? "Cash"),
+                    active: String(u.active ?? u.Aktif ?? true).toLowerCase() !== 'false',
+                    canChatBot: String(u.canChatBot ?? u["Chat Bot"] ?? true).toLowerCase() !== 'false',
+                    canReceiveReport: String(u.canReceiveReport ?? u.Report ?? false).toLowerCase() === 'true',
+                    allowedPortfolios: this.parseJsonMaybe(u.allowedPortfolios ?? u.Portofolio, ["pribadi"])
+                }));
+            },
+
             startRealtimeSync() {
                 if (this.realtimeSyncTimer) return;
-                this.realtimeSyncTimer = setInterval(() => {
-                    this.syncFromCloud(true);
-                    this.updateBrandingUI();
-                }, 5000);
+                this.realtimeSyncTimer = setInterval(() => this.syncFromCloud(true), 5000);
             },
 
             formatCur(amount) {
@@ -1759,13 +1873,19 @@
                 this.updateHeader();
                 this.populateReportWalletDropdown();
                 this.updateBrandingUI();
-                
+
+                state.globalSettings.scriptUrl = HARDCORE_SCRIPT_URL;
+
+                // Browser baru tidak boleh push dummy. Tarik cloud dulu.
+                this.syncFromCloud(true).then(() => {
+                    CLOUD_LOADED = true;
+                    this.navigate('dashboard');
+                    this.startRealtimeSync();
+                });
+
                 if(localStorage.getItem('imers_auth') === 'true') {
                     document.getElementById('view-auth').classList.add('hidden');
                     document.getElementById('app-container').classList.remove('hidden');
-                    this.navigate('dashboard');
-
-                    // Data cloud sudah otomatis ditarik dari hardcoded endpoint saat app init.
                 } else {
                     document.getElementById('view-auth').classList.remove('hidden');
                 }
@@ -1947,9 +2067,8 @@
                 this.updatePinDisplay();
                 this.navigate('dashboard');
                 
-                // Tarik ulang data cloud saat login berhasil.
+                // Tarik data cloud setelah login berhasil
                 this.syncFromCloud(true);
-                    this.updateBrandingUI();
             },
 
             logout() {
@@ -2103,7 +2222,7 @@
                 document.getElementById('cfg-wa-gateway').value = s.waGateway;
                 document.getElementById('cfg-wa-token').value = s.waToken;
                 document.getElementById('cfg-wa-number').value = s.waNumber;
-                document.getElementById('cfg-script-url').value = HARDCORE_SCRIPT_URL; // Hardcoded Apps Script URL
+                document.getElementById('cfg-script-url').value = HARDCORE_SCRIPT_URL;
                 
                 document.getElementById('cfg-report-email').value = s.reportEmail;
                 document.getElementById('cfg-report-freq').value = s.reportFreq;
@@ -2614,7 +2733,7 @@
                     return;
                 }
 
-                const scriptUrl = HARDCORE_SCRIPT_URL;
+                const scriptUrl = state.globalSettings.scriptUrl;
                 if (!scriptUrl) {
                     alert("URL Apps Script belum diatur! Silakan isi di menu Pengaturan & Sistem > Integrasi & Automasi.");
                     return;
@@ -2637,7 +2756,6 @@
                     // Send POST request to Apps Script Web App
                     await fetch(scriptUrl, {
                         method: 'POST',
-                        cache: 'no-store',
                         body: JSON.stringify(payload)
                     });
 
@@ -3460,11 +3578,7 @@
                 // Categories specific save is handled in saveCategory/deleteCategory
                 localStorage.setItem('imers_categories', JSON.stringify(state.categories));
                 localStorage.setItem('imers_users', JSON.stringify(state.users));
-                // Cache browser hanya mirror sementara
-                        localStorage.setItem('imers_global_settings', JSON.stringify(state.globalSettings));
-
-                        // Sinkron utama tetap ke Google Sheet
-                        this.syncToCloud();
+                localStorage.setItem('imers_global_settings', JSON.stringify(state.globalSettings));
                 
                 // [BARU] Otomatis backup ke Sheet tiap ada perubahan data
                 this.syncToCloud();
@@ -3472,14 +3586,11 @@
 
             // [BARU] Fungsi Lempar Data ke Google Sheets (Background)
             async syncToCloud() {
-
-                // Jangan overwrite Google Sheet sebelum cloud selesai dimuat
                 if (!CLOUD_LOADED) {
                     console.log('BLOCKED DEFAULT OVERWRITE');
                     return;
                 }
                 const scriptUrl = HARDCORE_SCRIPT_URL;
-                if (!scriptUrl) return;
 
                 // Kirim state yang aman saja. Jangan kirim Chart.js object karena bisa bikin JSON.stringify gagal.
                 const cloudState = {
@@ -3506,12 +3617,10 @@
             // [BARU] Fungsi Tarik Data dari Google Sheets
 
             async syncFromCloud(isSilent = false) {
-                const scriptUrl = HARDCORE_SCRIPT_URL;
-                if (!scriptUrl) {
-                    if(!isSilent) alert("URL Apps Script belum diatur di Pengaturan Sistem!");
-                    return;
-                }
+                if (CLOUD_LOADING) return;
+                CLOUD_LOADING = true;
 
+                const scriptUrl = HARDCORE_SCRIPT_URL;
                 const btn = document.getElementById('btn-sync-cloud');
                 if(btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
 
@@ -3530,87 +3639,56 @@
                         throw new Error('Response Apps Script bukan JSON valid. Cek deployment /exec.');
                     }
 
-                    // Backend lama: {status:'success', data:{...}}
-                    // Backend baru: {status:'success', wallets:[...], transactions:[...]}
                     const cloudData = json.data || json;
 
                     if(json.status === 'success' && cloudData) {
-                        if (Array.isArray(cloudData.wallets)) {
-                            state.wallets = cloudData.wallets.map(w => ({
-                                id: String(w.id ?? w.ID ?? w['ID Wallet'] ?? ('w' + Date.now())),
-                                name: String(w.name ?? w.Nama ?? w['Nama Wallet'] ?? 'Wallet'),
-                                balance: app.toNumber(w.balance ?? w.Saldo ?? 0),
-                                icon: w.icon || w.Icon || 'fa-wallet',
-                                color: w.color || w.Warna || 'text-blue-500',
-                                group: String(w.group || w.Group || 'pribadi').toLowerCase()
-                            }));
-                        }
+                        state.wallets = this.normalizeWallets(cloudData.wallets || []);
 
-                        if (Array.isArray(cloudData.transactions)) {
-                            state.transactions = cloudData.transactions.map(t => ({
-                                id: String(t.id ?? t.ID ?? t['ID Transaksi'] ?? ('T' + Date.now())),
-                                date: t.date ?? t.Tanggal ?? new Date().toISOString(),
-                                desc: String(t.desc ?? t.Deskripsi ?? t.note ?? t.Catatan ?? '-'),
-                                category: String(t.category ?? t.Kategori ?? 'Other'),
-                                wallet: String(t.wallet ?? t.Wallet ?? 'Cash'),
-                                type: app.normalizeType(t.type ?? t.Tipe ?? 'expense'),
-                                amount: app.toNumber(t.amount ?? t.Nominal ?? 0)
-                            }));
-                        }
+                        state.transactions = this.normalizeTransactions(cloudData.transactions || []);
 
-                        state.debts = cloudData.debts || state.debts;
-                        state.categories = cloudData.categories || state.categories;
-                        state.budgets = cloudData.budgets || state.budgets;
-                        state.users = cloudData.users || state.users;
+                        state.debts = this.normalizeDebts(cloudData.debts || []);
 
-                        const dbSettings = cloudData.globalSettings;
-                        if(dbSettings) {
-                            state.globalSettings = {
-                                ...INITIAL_GLOBAL_SETTINGS,
-                                ...dbSettings,
-                                scriptUrl: HARDCORE_SCRIPT_URL
-                            };
-                        }
+                        const catData = this.normalizeCategories(cloudData.categories || {}, cloudData.budgets || {});
+                        state.categories = catData.categories;
+                        state.budgets = catData.budgets;
 
-                        // Pastikan activeWallets tetap cocok dengan wallet dari Sheet.
-                        const currentActive = Array.isArray(state.globalSettings.activeWallets) ? state.globalSettings.activeWallets : [];
-                        const walletIds = state.wallets.map(w => String(w.id));
-                        const walletNames = state.wallets.map(w => String(w.name));
-                        const hasMatchingActive = currentActive.some(id =>
-                            walletIds.includes(String(id)) || walletNames.includes(String(id))
+                        state.users = this.normalizeUsers(cloudData.users || []);
+
+                        state.globalSettings = this.normalizeSettings(
+                            cloudData.globalSettings || cloudData.settings || {}
                         );
 
-                        if (!hasMatchingActive) {
-                            state.globalSettings.activeWallets = walletIds;
+                        if (!Array.isArray(state.globalSettings.activeWallets) || state.globalSettings.activeWallets.length === 0) {
+                            state.globalSettings.activeWallets = state.wallets.map(w => w.id);
                         }
 
-                        // Simpan ke localStorage tanpa memicu syncToCloud lagi.
+                        // Cache cuma mirror. Google Sheet tetap master.
                         localStorage.setItem('imers_transactions', JSON.stringify(state.transactions));
                         localStorage.setItem('imers_wallets', JSON.stringify(state.wallets));
                         localStorage.setItem('imers_debts', JSON.stringify(state.debts));
                         localStorage.setItem('imers_budgets', JSON.stringify(state.budgets));
                         localStorage.setItem('imers_categories', JSON.stringify(state.categories));
                         localStorage.setItem('imers_users', JSON.stringify(state.users));
-                        // Cache browser hanya mirror sementara
                         localStorage.setItem('imers_global_settings', JSON.stringify(state.globalSettings));
 
-                        // Sinkron utama tetap ke Google Sheet
-                        this.syncToCloud();
+                        CLOUD_LOADED = true;
 
-                        // Render ulang UI setelah data Google Sheet masuk.
-                        app.updateBrandingUI();
-                        app.updateHeader();
-                        app.populateReportWalletDropdown();
-                        if(!document.getElementById('view-dashboard').classList.contains('hidden')) app.renderDashboard();
-                        if(!document.getElementById('view-history').classList.contains('hidden')) app.renderHistory();
-                        if(!document.getElementById('view-analysis').classList.contains('hidden')) app.renderAnalysis();
-                        if(!document.getElementById('view-users').classList.contains('hidden')) app.renderUsers();
-                        if(!document.getElementById('view-debt').classList.contains('hidden')) app.renderDebt();
+                        this.updateBrandingUI();
+                        this.updateHeader();
+                        this.populateReportWalletDropdown();
+
+                        if(!document.getElementById('view-dashboard').classList.contains('hidden')) this.renderDashboard();
+                        if(!document.getElementById('view-history').classList.contains('hidden')) this.renderHistory();
+                        if(!document.getElementById('view-analysis').classList.contains('hidden')) this.renderAnalysis();
+                        if(!document.getElementById('view-users').classList.contains('hidden')) this.renderUsers();
+                        if(!document.getElementById('view-debt').classList.contains('hidden')) this.renderDebt();
+                        if(!document.getElementById('view-budget').classList.contains('hidden')) this.renderBudgetList();
+                        if(!document.getElementById('view-settings').classList.contains('hidden')) this.populateGlobalSettingsForm();
 
                         if(!isSilent) {
                             const toast = document.createElement('div');
                             toast.className = "fixed bottom-5 right-5 glass border-l-4 border-[var(--primary-color)] p-4 shadow-2xl z-50 fade-in text-xs font-semibold text-textMain";
-                            toast.innerHTML = `<i class="fa-solid fa-cloud-arrow-down text-[var(--primary-color)] mr-2"></i> Data berhasil disinkronisasi dari Google Sheets!`;
+                            toast.innerHTML = `<i class="fa-solid fa-cloud-arrow-down text-[var(--primary-color)] mr-2"></i> Data FULL berhasil disinkronisasi dari Google Sheets!`;
                             document.body.appendChild(toast);
                             setTimeout(() => toast.remove(), 4000);
                         }
@@ -3621,6 +3699,7 @@
                     console.error('syncFromCloud error:', e);
                     if(!isSilent) alert("Error koneksi ke Apps Script: " + e.message);
                 } finally {
+                    CLOUD_LOADING = false;
                     if(btn) btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i>';
                 }
             },
