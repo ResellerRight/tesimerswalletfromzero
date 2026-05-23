@@ -1522,6 +1522,7 @@
 
     <script>
         // --- HARDCORE APPS SCRIPT ENDPOINT ---
+        let CLOUD_LOADED = false;
         const HARDCORE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyevlgaqpHnk6d7ViT4OS5L2HiSozOvZQdDUubWmqcI208q4fiu784D3AMlqIBI6Xbxzg/exec";
 
         // --- APP STATE & MOCK DATA ---
@@ -3471,6 +3472,12 @@
 
             // [BARU] Fungsi Lempar Data ke Google Sheets (Background)
             async syncToCloud() {
+
+                // Jangan overwrite Google Sheet sebelum cloud selesai dimuat
+                if (!CLOUD_LOADED) {
+                    console.log('BLOCKED DEFAULT OVERWRITE');
+                    return;
+                }
                 const scriptUrl = HARDCORE_SCRIPT_URL;
                 if (!scriptUrl) return;
 
