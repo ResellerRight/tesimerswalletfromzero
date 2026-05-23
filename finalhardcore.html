@@ -3463,7 +3463,7 @@
                         localStorage.setItem('imers_global_settings', JSON.stringify(state.globalSettings));
 
                         // Sinkron utama tetap ke Google Sheet
-                        await this.syncToCloud();
+                        this.syncToCloud();
                 
                 // [BARU] Otomatis backup ke Sheet tiap ada perubahan data
                 this.syncToCloud();
@@ -3588,7 +3588,7 @@
                         localStorage.setItem('imers_global_settings', JSON.stringify(state.globalSettings));
 
                         // Sinkron utama tetap ke Google Sheet
-                        await this.syncToCloud();
+                        this.syncToCloud();
 
                         // Render ulang UI setelah data Google Sheet masuk.
                         app.updateBrandingUI();
