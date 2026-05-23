@@ -120,7 +120,7 @@
             display: none;
         }
 
-        /* Brand logo: keep uploaded transparent PNG clean without blue wrapper */
+        /* Brand logoUrl: keep uploaded transparent PNG clean without blue wrapper */
         .brand-logo-frame {
             background: transparent !important;
             box-shadow: none !important;
@@ -1617,7 +1617,7 @@
                 'Salary': 'income', 'Business Profit': 'income', 'Other Income': 'income'
             },
             users: JSON.parse(localStorage.getItem('imers_users')) || INITIAL_USERS,
-            globalSettings: JSON.parse(localStorage.getItem('imers_global_settings')) || INITIAL_GLOBAL_SETTINGS,
+            globalSettings: { ...INITIAL_GLOBAL_SETTINGS },
             theme: localStorage.getItem('imers_theme') || 'soft',
             charts: {},
             generatedReport: null,
@@ -1626,6 +1626,9 @@
 
         // Normalize persisted settings so older localStorage data does not break new features.
         state.globalSettings = { ...INITIAL_GLOBAL_SETTINGS, ...(state.globalSettings || {}) };
+
+        // Semua branding/settings sekarang cloud-first dari Google Sheet
+        // bukan dari localStorage browser.
         state.globalSettings.scriptUrl = HARDCORE_SCRIPT_URL;
         if (!Array.isArray(state.globalSettings.activeWallets) || state.globalSettings.activeWallets.length === 0) {
             state.globalSettings.activeWallets = INITIAL_GLOBAL_SETTINGS.activeWallets.slice();
@@ -1640,6 +1643,7 @@
                 if (this.realtimeSyncTimer) return;
                 this.realtimeSyncTimer = setInterval(() => {
                     this.syncFromCloud(true);
+                    this.updateBrandingUI();
                 }, 5000);
             },
 
@@ -1944,6 +1948,7 @@
                 
                 // Tarik ulang data cloud saat login berhasil.
                 this.syncFromCloud(true);
+                    this.updateBrandingUI();
             },
 
             logout() {
@@ -3454,7 +3459,11 @@
                 // Categories specific save is handled in saveCategory/deleteCategory
                 localStorage.setItem('imers_categories', JSON.stringify(state.categories));
                 localStorage.setItem('imers_users', JSON.stringify(state.users));
-                localStorage.setItem('imers_global_settings', JSON.stringify(state.globalSettings));
+                // Cache browser hanya mirror sementara
+                        localStorage.setItem('imers_global_settings', JSON.stringify(state.globalSettings));
+
+                        // Sinkron utama tetap ke Google Sheet
+                        await this.syncToCloud();
                 
                 // [BARU] Otomatis backup ke Sheet tiap ada perubahan data
                 this.syncToCloud();
@@ -3549,7 +3558,11 @@
 
                         const dbSettings = cloudData.globalSettings;
                         if(dbSettings) {
-                            state.globalSettings = { ...state.globalSettings, ...dbSettings, scriptUrl: HARDCORE_SCRIPT_URL };
+                            state.globalSettings = {
+                                ...INITIAL_GLOBAL_SETTINGS,
+                                ...dbSettings,
+                                scriptUrl: HARDCORE_SCRIPT_URL
+                            };
                         }
 
                         // Pastikan activeWallets tetap cocok dengan wallet dari Sheet.
@@ -3571,7 +3584,11 @@
                         localStorage.setItem('imers_budgets', JSON.stringify(state.budgets));
                         localStorage.setItem('imers_categories', JSON.stringify(state.categories));
                         localStorage.setItem('imers_users', JSON.stringify(state.users));
+                        // Cache browser hanya mirror sementara
                         localStorage.setItem('imers_global_settings', JSON.stringify(state.globalSettings));
+
+                        // Sinkron utama tetap ke Google Sheet
+                        await this.syncToCloud();
 
                         // Render ulang UI setelah data Google Sheet masuk.
                         app.updateBrandingUI();
